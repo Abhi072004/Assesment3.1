@@ -1,0 +1,114 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
+
+
+// Decentralized Auction management system
+contract DeAuction {
+    struct Auction {
+        uint256 id;
+        address payable seller;
+        string item;
+        uint256 basePrice;
+        uint256 highestBid;
+        address payable highestBidder;
+        uint256 endTime;
+        bool ended;
+    }
+
+    uint256 public itemsCount = 0;
+    mapping(uint256 => Auction) public auctions;
+
+    event AuctionCreated(uint256 id, address seller, string item, uint256 startPrice, uint256 endTime);
+    event NewBidPlaced(uint256 auctionId, address bidder, uint256 amount);
+    event AuctionEnded(uint256 auctionId, address winner, uint256 amount);
+
+    modifier onlySeller(uint256 auctionId) {
+        require(auctions[auctionId].seller == msg.sender, "Only the owner is allowed to end this auction");
+        _;
+    }
+
+    modifier auctionExists(uint256 auctionId) {
+        require(auctionId > 0 && auctionId <= itemsCount, "Auction is no longer existed");
+        _;
+    }
+
+    modifier auctionNotEnded(uint256 auctionId) {
+        require(!auctions[auctionId].ended, "Auction has already been ended");
+        _;
+    }
+
+    modifier auctionInProgress(uint256 auctionId) {
+        require(block.timestamp < auctions[auctionId].endTime, "Auction has already been ended");
+        _;
+    }
+
+    // Function to add a new item for selling
+    function createAuction(string memory item, uint256 basePrice, uint256 duration) public {
+        require(bytes(item).length > 0, "Item name cannot be empty");
+        require(basePrice > 0, "Starting price must be greater than 0");
+        require(duration > 60, "Duration must be greater than 1 minute");
+
+        itemsCount++;
+        auctions[itemsCount] = Auction({
+            id: itemsCount,
+            seller: payable(msg.sender),
+            item: item,
+            basePrice: basePrice,
+            highestBid: basePrice,
+            highestBidder: payable(address(0)),
+            endTime: block.timestamp + duration,
+            ended: false
+        });
+
+        emit AuctionCreated(itemsCount, msg.sender, item, basePrice, block.timestamp + duration);
+    }
+
+    // Function to place a bid on an auction(item)
+    function placeBid(uint256 auctionId) public payable auctionExists(auctionId) auctionInProgress(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        require(msg.value > auction.highestBid, string(abi.encodePacked("Your bid can't be less than highest bid",msg.value)));
+
+        if (auction.highestBidder != address(0)) {
+            // Refund the previous highest bidder
+            auction.highestBidder.transfer(auction.highestBid);
+        }
+
+        auction.highestBid = msg.value;
+        auction.highestBidder = payable(msg.sender);
+
+        emit NewBidPlaced(auctionId, msg.sender, msg.value);
+    }
+
+    // Function to end an auction and transfer the highest bid to the seller
+    function endAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) auctionNotEnded(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        require(block.timestamp >= auction.endTime, "Auction has not yet ended");
+
+        auction.ended = true;
+        if (auction.highestBidder != address(0)) {
+            auction.seller.transfer(auction.highestBid);
+        }
+
+        emit AuctionEnded(auctionId, auction.highestBidder, auction.highestBid);
+    }
+
+    // Function to demonstrate assert
+    function checkAuctionState(uint256 auctionId, bool expectedEndedStatus) public view auctionExists(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        assert(auction.ended == expectedEndedStatus);
+    }
+
+    // Function to demonstrate revert
+    function invalidateAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) {
+        Auction storage auction = auctions[auctionId];
+        require(!auction.ended, "Auction has already ended");
+
+        auction.ended = true;
+        auction.highestBid = 0;
+        if (auction.highestBidder != address(0)) {
+            auction.highestBidder.transfer(auction.highestBid);
+        }
+
+        revert("Auction has been invalidated and bids refunded");
+    }
+}
