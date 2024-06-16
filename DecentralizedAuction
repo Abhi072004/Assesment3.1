@@ -66,7 +66,7 @@ contract DeAuction {
     // Function to place a bid on an auction(item)
     function placeBid(uint256 auctionId) public payable auctionExists(auctionId) auctionInProgress(auctionId) {
         Auction storage auction = auctions[auctionId];
-        require(msg.value > auction.highestBid, string(abi.encodePacked("Your bid can't be less than highest bid",msg.value)));
+        require(msg.value > auction.highestBid,"Your bid can't be less than highest bid");
 
         if (auction.highestBidder != address(0)) {
             // Refund the previous highest bidder
