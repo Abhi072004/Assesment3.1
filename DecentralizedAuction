@@ -64,9 +64,11 @@ contract DeAuction {
     }
 
     // Function to place a bid on an auction(item)
-    function placeBid(uint256 auctionId) public payable auctionExists(auctionId) auctionInProgress(auctionId) {
+    function placeBid(uint256 auctionId) public payable auctionExists(auctionId) auctionNotEnded(auctionId) auctionInProgress(auctionId) {
         Auction storage auction = auctions[auctionId];
-        require(msg.value > auction.highestBid, "Your bid can't be less than highest bid");
+        if(msg.value <= auction.highestBid){
+            revert("Your bid can't be less than highest bid");
+        } 
 
         if (auction.highestBidder != address(0)) {
             // Refund the previous highest bidder
@@ -80,9 +82,8 @@ contract DeAuction {
     }
 
     // Function to end an auction and transfer the highest bid to the seller
-    function endAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) auctionNotEnded(auctionId) {
+    function endAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) auctionNotEnded(auctionId) auctionInProgress(auctionId){
         Auction storage auction = auctions[auctionId];
-        require(block.timestamp >= auction.endTime, "Auction has not yet ended");
 
         auction.ended = true;
         if (auction.highestBidder != address(0)) {
@@ -99,16 +100,14 @@ contract DeAuction {
     }
 
     // Function to demonstrate revert
-    function invalidateAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) {
+    function invalidateAuction(uint256 auctionId) public auctionExists(auctionId) onlySeller(auctionId) auctionNotEnded(auctionId){
         Auction storage auction = auctions[auctionId];
-        require(!auction.ended, "Auction has already ended");
 
         auction.ended = true;
-        auction.highestBid = 0;
         if (auction.highestBidder != address(0)) {
             auction.highestBidder.transfer(auction.highestBid);
         }
-
-        revert("Auction has been invalidated and bids refunded");
+        auction.highestBid = 0;
+        auction.highestBidder= payable(address(0));
     }
 }
