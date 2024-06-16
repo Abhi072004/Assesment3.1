@@ -28,7 +28,7 @@ contract DeAuction {
     }
 
     modifier auctionExists(uint256 auctionId) {
-        require(auctionId > 0 && auctionId <= itemsCount, "Auction is no longer existed");
+        require(auctionId > 0 && auctionId <= itemsCount, "The auction was never existed");
         _;
     }
 
@@ -66,7 +66,7 @@ contract DeAuction {
     // Function to place a bid on an auction(item)
     function placeBid(uint256 auctionId) public payable auctionExists(auctionId) auctionInProgress(auctionId) {
         Auction storage auction = auctions[auctionId];
-        require(msg.value > auction.highestBid,"Your bid can't be less than highest bid");
+        require(msg.value > auction.highestBid, "Your bid can't be less than highest bid");
 
         if (auction.highestBidder != address(0)) {
             // Refund the previous highest bidder
